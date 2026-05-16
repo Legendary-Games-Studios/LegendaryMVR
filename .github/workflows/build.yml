@@ -1,0 +1,63 @@
+name: Build Android APK (Fixed SDK)
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
+
+    - name: Install system dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git zip unzip python3-pip \
+          build-essential libffi-dev libssl-dev default-jdk wget
+
+    - name: Install Python deps
+      run: |
+        pip install --upgrade pip
+        pip install cython buildozer==1.4.0 kivy
+
+    - name: Install Android SDK cmdline-tools (FIX SDKMANAGER)
+      run: |
+        mkdir -p $HOME/android-sdk/cmdline-tools
+        cd $HOME/android-sdk
+
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+        unzip tools.zip
+
+        mkdir -p cmdline-tools/latest
+        mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+
+        echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+        echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
+    - name: Accept Android licenses
+      run: |
+        yes | sdkmanager --licenses || true
+
+    - name: Install required SDK packages
+      run: |
+        sdkmanager "platform-tools" \
+                   "platforms;android-33" \
+                   "build-tools;33.0.2"
+
+    - name: Build APK
+      run: |
+        buildozer -v android debug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: LegendaryMVR-APK
+        path: bin/*.apk
